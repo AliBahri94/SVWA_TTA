@@ -47,7 +47,7 @@ Then, extract all of these folders into the same directory for easier use.
 Please refer to [MATE](https://github.com/jmiemirza/MATE) GitHub. 
 
 ### Pretrained Models on clean datasets
-All pretrained models on ModelNet, ShapeNet and ScanObjectNN can be found [Google Drive](https://drive.google.com/drive/folders/1wUH7gInq5OHwNo5c6bOVYMeguwZiEA0B?usp=sharing)
+All pretrained models on ModelNet, ShapeNet and ScanObjectNN can be found [Google Drive]()
 
 
 
