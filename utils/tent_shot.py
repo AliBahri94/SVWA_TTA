@@ -1,0 +1,512 @@
+from copy import deepcopy
+import torch.jit
+import torch.optim as optim
+from tools import builder
+import copy
+
+loss_ce = torch.nn.CrossEntropyLoss() 
+
+def setup_tent_shot(args, model):  
+#def setup_tent_shot(args, model, config):                                                                            ### Added by Ali
+    """Set up tent adaptation.
+
+    Configure the model for training + feature modulation by batch statistics,
+    collect the parameters for feature modulation by gradient optimization,
+    set up the optimizer, and then tent the model.
+    """
+    model = configure_model(args, model)  #  set only Batchnorm3d layers to trainable,   freeze all the other layers
+    params, param_names = collect_params(model, args)  # collecting gamma and beta in all Batchnorm3d layers
+    #####params, param_names = collect_params_all_parameters(model, args)  # collecting gamma and beta in all Batchnorm3d layers
+    optimizer = setup_optimizer(args, params)  # todo hyperparameters are hard-coded above                        ### Added by Ali
+    #optimizer = builder.build_opti_sche(model, config)[0]  # todo hyperparameters are hard-coded above  
+    return model, optimizer  
+
+
+def setup_tent_shot_both(args, model):  
+#def setup_tent_shot(args, model, config):                                                                            ### Added by Ali
+    """Set up tent adaptation.
+
+    Configure the model for training + feature modulation by batch statistics,
+    collect the parameters for feature modulation by gradient optimization, 
+    set up the optimizer, and then tent the model.
+    """
+    model = configure_model_both(args, model)  #  set only Batchnorm3d layers to trainable,   freeze all the other layers
+    params, param_names = collect_params_both(model, args)  # collecting gamma and beta in all Batchnorm3d layers
+    ########params, param_names = collect_params_both_all_parameters(model, args)  # collecting gamma and beta in all Batchnorm3d layers
+    optimizer = setup_optimizer(args, params)  # todo hyperparameters are hard-coded above                        ### Added by Ali
+    #optimizer = builder.build_opti_sche(model, config)[0]  # todo hyperparameters are hard-coded above  
+    return model, optimizer        
+
+
+def setup_optimizer(tent_args, params):
+    """Set up optimizer for tent adaptation.
+
+    Tent needs an optimizer for test-time entropy minimization.
+    In principle, tent could make use of any gradient optimizer.
+    In practice, we advise choosing Adam or SGD+momentum.
+    For optimization settings, we advise to use the settings from the end of
+    trainig, if known, or start with a low learning rate (like 0.001) if not.
+
+    For best results, try tuning the learning rate and batch size.
+    """
+    return optim.Adam(params,
+                      lr=tent_args.LR,
+                      betas=(tent_args.BETA, 0.999), 
+                      weight_decay=tent_args.WD)    
+
+
+
+@torch.jit.script
+def softmax_entropy(x: torch.Tensor) -> torch.Tensor:
+    """Entropy of softmax distribution from logits."""
+    return -(x.softmax(1) * x.log_softmax(1)).sum(1)
+
+
+
+
+def safe_log(x, ver):
+    if ver == 1:
+        return torch.log(x + 1e-5)
+    elif ver == 2:
+        return torch.log(x + 1e-7)
+    elif ver == 3:
+        return torch.clamp(torch.log(x), min=-100)
+    else:
+        raise ValueError("safe_log version is not properly defined !!!")
+
+
+def softmax_diversity_regularizer(x):
+    x2 = x.softmax(-1).mean(0)  # [b, c] -> [c]
+    return (x2 * safe_log(x2, ver=3)).sum()
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_shot(x, model, optimizer):
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward
+    outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+    loss = softmax_diversity_regularizer(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+    return outputs
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_shot_PointNet(x, model, optimizer):
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward
+    outputs = model.module.forward(x)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction    
+    loss = softmax_diversity_regularizer(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+    return outputs
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_tent(x, model, optimizer):
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward              
+    outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+    loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+    loss.backward()
+    optimizer.step() 
+    optimizer.zero_grad()
+    return outputs
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_tent_with_WA(x, model, optimizer, all_weights, iteration, layer_norm): 
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward    
+    for i in range (iteration):          
+        outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()     
+    
+    weights = {}   
+    for name, module in model.named_modules():  
+        #if isinstance(module, torch.nn.LayerNorm):   
+        if (layer_norm == False):
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)    
+        else:
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm) or isinstance(module, torch.nn.LayerNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)                  
+    all_weights.append(weights) 
+
+    return outputs, all_weights
+
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_tent_with_WA_Ensemble(x, model, optimizer, iteration, layer_norm): 
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward    
+    for i in range (iteration):          
+        outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()     
+
+    return outputs
+
+
+
+def forward_and_adapt_tent_with_WA_with_CE(x, model, optimizer, all_weights, iteration): 
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward    
+    for i in range (iteration):          
+        outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        gt_sudo_label = outputs.argmax(-1).view(-1)
+        loss = loss_ce(outputs, gt_sudo_label)
+        #loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()    
+        optimizer.step()
+        optimizer.zero_grad()     
+    
+    weights = {}
+    for name, module in model.named_modules():  
+        #if isinstance(module, torch.nn.LayerNorm):
+        if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):  
+            for nparam, p in module.named_parameters():
+                if nparam in ['weight', 'bias']:
+                    weights[f"{name}.{nparam}"] = copy.deepcopy(p)
+    all_weights.append(weights)  
+
+    return outputs, all_weights
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def PointNet_forward_and_adapt_tent_with_WA(x, model, optimizer, all_weights, iteration, layer_norm): 
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward    
+    for i in range (iteration):          
+        outputs = model.forward(x)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()        
+    
+    weights = {}
+    for name, module in model.named_modules():   
+        #if isinstance(module, torch.nn.LayerNorm):
+        if (layer_norm == False):
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm): 
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)
+        else:
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm) or isinstance(module, torch.nn.LayerNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)    
+    all_weights.append(weights)      
+
+    return outputs, all_weights       
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def PointNet_forward_and_adapt_tent_with_WA_with_CE(x, model, optimizer, all_weights, iteration, layer_norm): 
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward    
+    for i in range (iteration):          
+        outputs = model.forward(x)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        gt_sudo_label = outputs.argmax(-1).view(-1)
+        loss = loss_ce(outputs, gt_sudo_label)
+        # loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()     
+    
+    weights = {}
+    for name, module in model.named_modules():   
+        #if isinstance(module, torch.nn.LayerNorm):
+        if (layer_norm == False):
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm): 
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)
+        else:
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm) or isinstance(module, torch.nn.LayerNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)                  
+    all_weights.append(weights)  
+
+    return outputs, all_weights
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_tent_modified(x, model, optimizer, all_weights, iteration, layer_norm):    
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward     
+    for i in range (iteration):         
+        outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad() 
+    
+    weights = {}
+    for name, module in model.named_modules():  
+        #if isinstance(module, torch.nn.LayerNorm):
+        if (layer_norm == False):
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)  
+        else:
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm) or isinstance(module, torch.nn.LayerNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)                  
+    all_weights.append(weights) 
+
+    return outputs, all_weights
+
+
+
+def forward_and_adapt_tent_modified_with_CE(x, model, optimizer, all_weights, iteration, layer_norm):    
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward     
+    for i in range (iteration):         
+        outputs = model.module.classification_only(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        gt_sudo_label = outputs.argmax(-1).view(-1)
+        loss = loss_ce(outputs, gt_sudo_label)
+        #loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()   
+    
+    weights = {}
+    for name, module in model.named_modules():  
+        #if isinstance(module, torch.nn.LayerNorm):
+        if (layer_norm == False):
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)  
+        else:
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm) or isinstance(module, torch.nn.LayerNorm):
+                for nparam, p in module.named_parameters():
+                    if nparam in ['weight', 'bias']:
+                        weights[f"{name}.{nparam}"] = copy.deepcopy(p)                  
+    all_weights.append(weights) 
+
+    return outputs, all_weights
+
+
+@torch.enable_grad()  # ensure grads in possible no grad context for testing
+def forward_and_adapt_tent_with_DINO(x, model, optimizer, iteration, mode):
+    """Forward and adapt model on batch of data.
+
+    Measure entropy of the model prediction, take gradients, and update params.
+    """
+    # forward  
+    for i in range (iteration):        
+        outputs, mse_loss = model.module.classification_only_train(x, only_unmasked=False)  # (batch * n_views, 3, T, 224,224 )  -> (batch * n_views, n_class ) todo clip-level prediction
+        loss = softmax_entropy(outputs).mean(0)   #   todo compute the entropy for all clip-level predictions   then take the averaga among all samples
+        #loss = loss + (1000.*mse_loss)
+        loss = 1000.*mse_loss
+        if (mode == "train"):
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()                  
+        else:
+            break          
+    return outputs   
+
+
+def collect_params(model, args):
+    """Collect the affine scale + shift parameters from batch norms.
+
+    Walk the model's modules and collect all batch normalization parameters.
+    Return the parameters and their names.
+
+    Note: other choices of parameterization are possible!
+    """
+    params = []
+    names = []
+    if args.baseline == 'tent':
+        for nm, m in model.named_modules():
+            if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+                for np, p in m.named_parameters():
+                    if np in ['weight', 'bias']:  # weight is scale gamma, bias is shift beta
+                        params.append(p)
+                        names.append(f"{nm}.{np}")
+    if args.baseline == 'shot':
+        for nm, m in model.named_modules():
+            for np, p in m.named_parameters():
+                params.append(p)
+                names.append(f"{nm}.{np}")
+
+    return params, names
+
+def collect_params_all_parameters(model, args):
+    """Collect the affine scale + shift parameters from batch norms.
+
+    Walk the model's modules and collect all batch normalization parameters.
+    Return the parameters and their names.
+
+    Note: other choices of parameterization are possible!
+    """
+    params = []
+    names = []
+    if args.baseline == 'tent':
+        for nm, m in model.named_modules():
+            for np, p in m.named_parameters():
+                params.append(p)
+                names.append(f"{nm}.{np}")
+    if args.baseline == 'shot':
+        for nm, m in model.named_modules():
+            for np, p in m.named_parameters():
+                params.append(p)
+                names.append(f"{nm}.{np}")    
+
+    return params, names
+
+
+def collect_params_both(model, args):
+    """Collect the affine scale + shift parameters from batch norms.
+
+    Walk the model's modules and collect all batch normalization parameters.
+    Return the parameters and their names.
+
+    Note: other choices of parameterization are possible!
+    """
+    params = []
+    names = []
+    if args.baseline == 'tent':
+        for nm, m in model.named_modules():
+            if isinstance(m, torch.nn.modules.batchnorm._BatchNorm) or isinstance(m, torch.nn.LayerNorm):
+                for np, p in m.named_parameters():
+                    if np in ['weight', 'bias']:  # weight is scale gamma, bias is shift beta
+                        params.append(p)
+                        names.append(f"{nm}.{np}")  
+    if args.baseline == 'shot':
+        for nm, m in model.named_modules():
+            for np, p in m.named_parameters():
+                params.append(p)
+                names.append(f"{nm}.{np}")
+
+    return params, names
+
+
+def collect_params_both_all_parameters(model, args):
+    """Collect the affine scale + shift parameters from batch norms.
+
+    Walk the model's modules and collect all batch normalization parameters.
+    Return the parameters and their names.
+
+    Note: other choices of parameterization are possible!
+    """
+    params = []
+    names = []
+    if args.baseline == 'tent': 
+        for nm, m in model.named_modules():    
+            #if isinstance(m, torch.nn.modules.batchnorm._BatchNorm) or isinstance(m, torch.nn.LayerNorm):
+            for np, p in m.named_parameters():
+                params.append(p)
+                names.append(f"{nm}.{np}")  
+    if args.baseline == 'shot':
+        for nm, m in model.named_modules():
+            for np, p in m.named_parameters():
+                params.append(p)
+                names.append(f"{nm}.{np}")
+
+    return params, names
+
+
+def copy_model_and_optimizer(model, optimizer):
+    """Copy the model and optimizer states for resetting after adaptation."""
+    model_state = deepcopy(model.state_dict())
+    optimizer_state = deepcopy(optimizer.state_dict())
+    return model_state, optimizer_state
+
+
+def load_model_and_optimizer(model, optimizer, model_state, optimizer_state):
+    """Restore the model and optimizer states from copies."""
+    model.load_state_dict(model_state, strict=True)
+    optimizer.load_state_dict(optimizer_state)
+
+
+def configure_model(args, model):
+    """Configure model for use with tent."""
+    model.train()
+    model.requires_grad_(False) 
+    for m in model.modules():
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+            m.requires_grad_(True)
+        m.track_running_stats = False # for original implementation this is False
+        m.running_mean = None # for original implementation uncomment this
+        m.running_var = None # for original implementation uncomment this
+
+    return model
+
+
+def configure_model_both(args, model):
+    """Configure model for use with tent."""
+    model.train()
+    model.requires_grad_(False)   
+    #####model.requires_grad_(True)                             
+    for m in model.modules():
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm) or isinstance(m, torch.nn.LayerNorm):   
+            m.requires_grad_(True)
+        m.track_running_stats = False # for original implementation this is False
+        m.running_mean = None # for original implementation uncomment this
+        m.running_var = None # for original implementation uncomment this
+
+    return model
+
+def check_model(model):
+    """Check model for compatability with tent."""
+    is_training = model.training
+    assert is_training, "tent needs train mode: call model.train()"
+    param_grads = [p.requires_grad for p in model.parameters()]
+    has_any_params = any(param_grads)
+    has_all_params = all(param_grads)
+    assert has_any_params, "tent needs params to update: " \
+                           "check which require grad"
+    assert not has_all_params, "tent should not update all params: " \
+                               "check which require grad"
+
+    has_bn = any([isinstance(m, torch.nn.modules.batchnorm._BatchNorm) for m in model.modules()])
+    assert has_bn, "tent needs normalization for its optimization"

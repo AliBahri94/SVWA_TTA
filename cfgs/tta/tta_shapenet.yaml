@@ -1,0 +1,69 @@
+optimizer : {
+  type: AdamW,
+  kwargs: {
+  lr : 0.0001,
+  weight_decay : 0.05
+}}
+
+scheduler: {
+  type: function,
+}
+
+dataset : {
+  train : { _base_: cfgs/dataset_configs/ShapeNetCore.yaml,
+            others: {subset: 'train'}},
+  val : { _base_: cfgs/dataset_configs/ShapeNetCore.yaml,
+            others: {subset: 'test'}},
+  test : { _base_: cfgs/dataset_configs/ShapeNetCore.yaml,
+            others: {subset: 'test'}}}
+
+model : {
+  NAME: PointNet,                
+  group_size: 32,    
+  num_group: 64,   
+  loss: cdl2, 
+  cls_dim: 55,
+  num_hid_cls_layers: 2,
+  group_norm: False,
+  regularize: True,
+
+  #### Added by Ali Network  
+  k: 20,  
+  emb_dims: 1024,
+  dropout: 0.5,  
+
+  transformer_config: {
+    mask_ratio: 0.9,  
+    mask_type: 'rand',
+    trans_dim: 384,
+    encoder_dims: 384,
+    depth: 12,
+    drop_path_rate: 0.1,
+    num_heads: 6,
+    decoder_depth: 4,
+    decoder_num_heads: 6,  
+
+    #### Added by Ali
+    method: "Tent_Modified",                                              ### Tent_Modified ,    Tent_WA_FPS                    
+    reset: True,         
+    reset_2: True,     
+    loss_encoder: "MSE",                            
+    N_downsample: 512,                                   
+    Number_downsample: 3,          
+    N_Aug: 6,               
+    N_Aug_2: 1, 
+    Type_Aug: "rotation",                       
+    batch_size: 128,                                      
+    iteration: 1,          
+    original: True,      
+    cross_entropy: True,               
+    layer_norm: False,         
+  },  
+  }
+
+npoints: 1024                                     #1024        
+npoints_ours: 512        
+total_bs : 128
+step_per_update : 1 
+max_epoch : 300
+tta_dataset_path : '/export/livia/home/vision/Abahri/projects/MATE/MATE/data/tta_datasets'
