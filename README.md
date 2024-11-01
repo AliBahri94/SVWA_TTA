@@ -1,6 +1,6 @@
 # Test-Time Adaptation in Point Clouds: Leveraging Sampling Variation with Weight Averaging
 
-![image](main_net.png)
+![image](./figures/main_net.png)
 
 Test-Time Adaptation (TTA) addresses distribution shifts during testing by adapting a pretrained model without access to source data. In this work, we propose a novel
 TTA approach for 3D point cloud classification, combining sampling variation with weight averaging. Our method leverages Farthest Point Sampling (FPS) and K-Nearest
