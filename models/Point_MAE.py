@@ -585,108 +585,6 @@ class Point_MAE(nn.Module):
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-    def DINO_MSE_loss(self, feat):   
-
-        _, t, f = feat.shape
-                        
-        feat_reshaped = feat.reshape(-1, 6, t, f)  
-        feat_reshaped_global = feat_reshaped[:, :2].permute(1, 0, 2, 3)
-        feat_reshaped_local = feat_reshaped[:, 2:].permute(1, 0, 2, 3)  
- 
-        total_loss = 0
-        n_loss_terms = 0  
-
-        for iq, q in enumerate(feat_reshaped_global):  
-            for v in range(len(feat_reshaped_local)):            
-                #if v == iq:
-                    # we skip cases where student and teacher operate on the same view  
-                #    continue
-                #loss = torch.sum(-q * F.log_softmax(student_out_reshaped[v], dim=-1), dim=-1)
-                feat_reshaped_local_ = torch.nn.functional.normalize(feat_reshaped_local[v], p=2, dim=-1)  
-                feat_reshaped_global_ = torch.nn.functional.normalize(q, p=2, dim=-1)   
-                #feat_reshaped_local_ = feat_reshaped_local[v]       
-                #feat_reshaped_global_ = q
-                loss = ((feat_reshaped_local_ - feat_reshaped_global_) ** 2).mean(dim=-1)           
-                total_loss += loss.mean()
-                 
-                n_loss_terms += 1
-        total_loss /= n_loss_terms
-
-        return total_loss
-
-    def DINO_KLD_loss(self, feat):   
-
-        _, t, f = feat.shape
-                        
-        feat_reshaped = feat.reshape(-1, 6, t, f)  
-        feat_reshaped_global = feat_reshaped[:, :2].permute(1, 0, 2, 3)
-        feat_reshaped_local = feat_reshaped[:, 2:].permute(1, 0, 2, 3) 
- 
-        total_loss = 0
-        n_loss_terms = 0  
-
-        for iq, q in enumerate(feat_reshaped_global):    
-            for v in (feat_reshaped_local):          
-  
-                # Ensure the tensors are in log space for tensor1 and probability space for tensor2
-                log_tensor1 = F.log_softmax(q, dim=-1)
-                tensor2 = F.softmax(v, dim=-1)  
-
-                # Compute KL Divergence
-                kl_div = F.kl_div(log_tensor1, tensor2, reduction='batchmean')
-
-                total_loss += kl_div.mean()
-                 
-                n_loss_terms += 1
-        total_loss /= n_loss_terms  
-
-        return total_loss   
-
-    def DINO_CE_loss(self, feat, epoch):   
-            
-            _, t, f = feat.shape
-                            
-            feat_reshaped = feat.reshape(-1, 6, t, f)  
-            feat_reshaped_global = feat_reshaped[:, :2].permute(1, 0, 2, 3)
-            feat_reshaped_local = feat_reshaped[:, 2:].permute(1, 0, 2, 3) 
-
-            feat_reshaped_local = feat_reshaped_local / self.student_temp
-
-            # teacher centering and sharpening
-            temp = self.teacher_temp_schedule[epoch]  
-            feat_reshaped_global_ = F.softmax((feat_reshaped_global.reshape(-1, feat_reshaped_global.shape[2], feat_reshaped_global.shape[3]) - self.center) / temp, dim=-1) 
-            feat_reshaped_global = feat_reshaped_global_.reshape(2, -1, feat_reshaped_global.shape[2], feat_reshaped_global.shape[3])    
-
-            total_loss = 0
-            n_loss_terms = 0    
-
-            for iq, q in enumerate(feat_reshaped_global):
-                for v in range(len(feat_reshaped_local)):
-                    ###if v == iq:
-                        # we skip cases where student and teacher operate on the same view
-                        ####continue  
-                     
-                    feat_reshaped_local_ = torch.nn.functional.normalize(feat_reshaped_local[v], p=2, dim=-1)     
-                    q_ = torch.nn.functional.normalize(q, p=2, dim=-1)   
-
-                    loss = torch.sum(-q_ * F.log_softmax(feat_reshaped_local_, dim=-1), dim=-1)     
-                    total_loss += loss.mean()
-                    n_loss_terms += 1
-            total_loss /= n_loss_terms
-
-            ######### Update center used for teacher output
-            batch_center = torch.sum(feat_reshaped_global.reshape(-1, feat_reshaped_global.shape[2], feat_reshaped_global.shape[3]), dim=0, keepdim=True)
-            #dist.all_reduce(batch_center)
-            #batch_center = batch_center / (len(teacher_out) * dist.get_world_size())
-            batch_center = batch_center / len(feat_reshaped_global.reshape(-1, feat_reshaped_global.shape[2], feat_reshaped_global.shape[3]))
-
-            # ema update
-            self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
-            #####################################
-
-            return total_loss   
-
-
     def classification_only(self, pts, only_unmasked=True):
         
         neighborhood, center = self.group_divider_test(pts)
@@ -1124,7 +1022,6 @@ class PointNet_ssg_Plus_Plus(nn.Module):
 
         return self.fc_layer(features.squeeze(-1))   
     
-        
         
 curve_config = {
     'default': [[100, 5], [100, 5], None, None],

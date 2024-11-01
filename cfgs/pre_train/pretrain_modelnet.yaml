@@ -20,11 +20,7 @@ dataset : {
             others: {subset: 'test', npoints: 1024}}}
 
 model : {
-  #NAME: Point_MAE, 
-  #NAME: PointNet, 
-  #NAME: DGCNN_cls,  
-  #NAME: PointNet_ssg_Plus_Plus,  
-  NAME: CurveNet,  
+  NAME: Point_MAE,                            ## Point_MAE   ,   PointNet   ,   DGCNN_cls   ,   CurveNet        
   group_size: 32,
   num_group: 64,
   loss: cdl2,

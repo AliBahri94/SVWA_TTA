@@ -58,14 +58,14 @@ CUDA_VISIBLE_DEVICES=0 python train.py --only_cls --config cfgs/pre_train/pretra
 
 ## Test-Time-Adaptation (TTA)
 ### Setting data paths 
-For TTT, go to `cfgs/tta/tta_<dataset_name>.yaml` and set the `tta_dataset_path` variable to the relative path of the dataset parent directory.  
+For TTT, please go to `cfgs/tta/tta_<dataset_name>.yaml` and set the `tta_dataset_path` variable to the relative path of the dataset parent directory.  
 E.g. if your data for ModelNet-C is in `./data/tta_datasets/modelnet-c`, set the variable to `./data/tta_datasets`.  
 
-Prallel Mode: Please refer to <dataset_name>.yaml file and set reset_2=True
+Prallel Mode: Please refer to <dataset_name>.yaml file and set loss_encoder=True
 
 Sequential Mode: Please refer to <dataset_name>.yaml file and set reset_2=False
 ```
-CUDA_VISIBLE_DEVICES=0 python ttt.py --dataset_name <dataset_name> --online --config cfgs/tta/tta_<dataset_name>.yaml --ckpts <path/to/pretrained/model>
+CUDA_VISIBLE_DEVICES=0 python ttt.py --dataset_name <dataset_name> --online --config cfgs/tta/tta_<dataset_name>.yaml --ckpts <path/to/pretrained/model> ---exp_name <path/to/saved>
 ```
 
 ## Inference

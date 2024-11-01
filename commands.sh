@@ -1,11 +1,8 @@
-#Pretraining
-CUDA_VISIBLE_DEVICES=0 python train.py --jt --config cfgs/pre_train/pretrain_modelnet.yaml --dataset modelnet
+#Pretraining      (Network has to be selected in pretrain_<dataset_name>.yaml)
 CUDA_VISIBLE_DEVICES=0 python train.py --only_cls --config cfgs/pre_train/pretrain_modelnet.yaml --dataset modelnet
 
-CUDA_VISIBLE_DEVICES=0 python train.py --jt --config cfgs/pre_train/pretrain_scanobject.yaml --dataset scanobject_nbg --ckpts models/pretrain.pth
 CUDA_VISIBLE_DEVICES=0 python train.py --only_cls --config cfgs/pre_train/pretrain_scanobject.yaml --dataset scanobject_nbg --ckpts models/pretrain.pth
 
-CUDA_VISIBLE_DEVICES=0 python train.py --jt --config cfgs/pre_train/pretrain_shapenetcore.yaml --dataset shapenetcore
 CUDA_VISIBLE_DEVICES=0 python train.py --only_cls --config cfgs/pre_train/pretrain_shapenetcore.yaml --dataset shapenetcore
 
 #TTT - Online

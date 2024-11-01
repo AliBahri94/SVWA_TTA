@@ -21,8 +21,8 @@ def get_args():
     parser.add_argument('--disable_bn_adaptation', action='store_true', help='to disable bn_for adaptation')
     parser.add_argument('--online', action='store_true', default=True, help='online-adapt')  
     parser.add_argument('--visualize_data', action='store_true', help='image creation')
-    #parser.add_argument('--ckpts', type=str, default=None, help='test used ckpt path')  
-    parser.add_argument('--ckpts', type=str, default="/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained/modelnet_src_only.pth", help='test used ckpt path')
+    parser.add_argument('--ckpts', type=str, default=None, help='test used ckpt path')  
+    # parser.add_argument('--ckpts', type=str, default="/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained/modelnet_src_only.pth", help='test used ckpt path')
     ############parser.add_argument('--config', type=str, help='yaml config file')
     #########parser.add_argument('--config', type=str, default= "./cfgs/tta/tta_shapenet.yaml", help='yaml config file')   
     parser.add_argument('--config', type=str, default= "./cfgs/tta/tta_modelnet.yaml", help='yaml config file')      
@@ -135,23 +135,30 @@ def get_args():
     if args.test:
         args.exp_name = 'test_' + args.exp_name       
     if args.mode is not None:
-        args.exp_name = args.exp_name + '_' + args.mode       
-    #args.experiment_path = os.path.join('/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained/shapenet_curvenet', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
-    #args.tfboard_path = os.path.join('/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained/shapenet_curvenet', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)  
+        args.exp_name = args.exp_name + '_' + args.mode   
+
+
+    args.experiment_path = os.path.join('./experiments', Path(args.config).stem, Path(args.config).parent.stem,
+                                        args.exp_name)
+    args.tfboard_path = os.path.join('./experiments', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard',
+                                     args.exp_name)    
+
+    # args.experiment_path = os.path.join('/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained_for_test/shapenet_pointmae', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
+    # args.tfboard_path = os.path.join('/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained_for_test/shapenet_pointmae', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)  
     
     #args.experiment_path = os.path.join('./Tent_experiments_24_Aug/PointMAE/ScanObjectNN/update_batch_layer_norm/learning_rate_0_001/Tent_WA_FPS_5_batch_128_reset_reset_2_True_iterate_1_npoints_512_with_original_PRETRAINED_MODEL_MATE', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
     #args.tfboard_path = os.path.join('./Tent_experiments_24_Aug/PointMAE/ScanObjectNN/update_batch_layer_norm/learning_rate_0_001/Tent_WA_FPS_5_batch_128_reset_reset_2_True_iterate_1_npoints_512_with_original_PRETRAINED_MODEL_MATE', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)
     
-    #args.experiment_path = os.path.join('./Tent_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/Source_Only', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
-    #args.tfboard_path = os.path.join('./Tent_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/Source_Only', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)
+    # args.experiment_path = os.path.join('./Tent_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/Source_Only', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
+    # args.tfboard_path = os.path.join('./Tent_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/Source_Only', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)
      
              
     #args.experiment_path = os.path.join('./Tent_experiments_24_Aug/PointNet/ModelNet_40/update_batch_layer_norm/learning_rate_0_001/Tent_WA_FPS_2_batch_128_reset_reset_2_True_iterate_1_npoints_512_with_original', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
     #args.tfboard_path = os.path.join('./Tent_experiments_24_Aug/PointNet/ModelNet_40/update_batch_layer_norm/learning_rate_0_001/Tent_WA_FPS_2_batch_128_reset_reset_2_True_iterate_1_npoints_512_with_original', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)
     
     
-    args.experiment_path = os.path.join('./Shot_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/SHOT_batch_16_iterate_1', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
-    args.tfboard_path = os.path.join('./Shot_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/SHOT_batch_16_iterate_1', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)
+    # args.experiment_path = os.path.join('./Shot_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/SHOT_batch_16_iterate_1', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
+    # args.tfboard_path = os.path.join('./Shot_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/SHOT_batch_16_iterate_1', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)
      
      
     #args.experiment_path = os.path.join('./PL_experiments_24_Aug/CurveNet/ModelNet_40/update_batch_norm/learning_rate_0_001/PL_6_batch_16_reset_reset_2_True_iterate_1_npoints_512_with_original', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)

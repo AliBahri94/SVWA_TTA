@@ -43,20 +43,17 @@ model : {
     decoder_num_heads: 6,
 
     #### Added by Ali
-    method: "Tent_Modified",                            ### Tent_Modified ,    Tent_WA_FPS                     
-    reset: True,         
-    reset_2: True,     
-    loss_encoder: "MSE",                       
-    N_downsample: 512,                                   
-    Number_downsample: 3,                 
-    N_Aug: 5,            
-    N_Aug_2: 1, 
-    Type_Aug: "rotation",                         
-    batch_size: 128,                                 
-    iteration: 1,            
-    original: True,     
-    cross_entropy: True,              
-    layer_norm: False,                       
+    method: Tent_WA_FPS,                       ### Tent_Modified ,    Tent_WA_FPS   ,     Ensemble        
+    reset: True,            
+    parallel_mode: True,   
+    loss_encoder: "MSE",                         
+    N_Aug: 6,        
+    Type_Aug: "jitter",                                                              
+    batch_size: 128,                                           
+    iteration: 1,                
+    original: True,                           ### default: True
+    cross_entropy: False,                                              
+    layer_norm: True,                         ### if True, batch norms and layer norms are updated.                              
   }, 
   }
 

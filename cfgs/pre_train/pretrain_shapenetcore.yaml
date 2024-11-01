@@ -21,7 +21,7 @@ dataset : {
             others: {subset: 'test'}}}
 
 model : {
-  NAME: CurveNet,
+  NAME: CurveNet,                             ## Point_MAE   ,   PointNet   ,   DGCNN_cls   ,   CurveNet
   group_size: 32,
   num_group: 64,
   loss: cdl2,

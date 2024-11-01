@@ -26,7 +26,7 @@ import numpy as np
 import torch.nn as nn
 from tqdm import tqdm
 from glob import glob
-from models_vis.tent import weight_average
+# from models_vis.tent import weight_average  
 import json
 from types import SimpleNamespace
 from pytorch3d.ops import knn_points
@@ -538,14 +538,11 @@ def tta_tent(args, config, train_writer=None):
     
     method = config.model.transformer_config.method
     episodic = config.model.transformer_config.reset   
-    episodic_2 = config.model.transformer_config.reset_2
+    episodic_2 = config.model.transformer_config.parallel_mode
     n_aug = config.model.transformer_config.N_Aug   
-    n_aug_2 = config.model.transformer_config.N_Aug_2   
     type_aug = config.model.transformer_config.Type_Aug  
     iteration = config.model.transformer_config.iteration   
     original = config.model.transformer_config.original   
-    N_downsample = config.model.transformer_config.N_downsample
-    Number_downsample = config.model.transformer_config.Number_downsample
     model_name = config.model.NAME
     cross_entropy = config.model.transformer_config.cross_entropy
      
@@ -569,41 +566,8 @@ def tta_tent(args, config, train_writer=None):
                     points = points
                 if (dataset_name == "shapenetcore" or dataset_name == "scanobject" or dataset_name == "scanobject_cvpr"):    
                     points = misc.fps(points, npoints)
-                    
-            elif (method == "Tent_WA"):  
-                B, P, C = points.shape
-                for i in range(n_aug):   
-                    points = torch.cat([points for _ in range(n_aug)], 0)  
-                #points = train_transforms_rotation(points) 
-                points = train_transforms_ScaleAndTranslate(points)            
                 
-            elif (method == "Tent_WA2"): 
-                B, P, C = points.shape
-                for i in range(n_aug):   
-                    points = torch.cat([points for _ in range(n_aug)], 0)
-                #points = train_transforms_rotation(points) 
-                points_aug = train_transforms_ScaleAndTranslate(points)    
-                points = torch.cat([points, points_aug], 0)  
-                
-            elif (method == "Tent_Dino"):  
-                points_list = []  
-                for i in range(6):
-                    if (i < 2):
-                        points = pytorch3d.ops.sample_farthest_points(points, K=npoints, random_start_point= True)[0] 
-                        assert points.size(1) == npoints
 
-                        points_list.append(points[None]) 
-
-                    else:
-                        points = pytorch3d.ops.sample_farthest_points(points, K=config.model.transformer_config.N_downsample, random_start_point= True)[0]
-                        points = torch.nn.functional.interpolate(points.permute(0, 2, 1)[..., None], size= (1024, 1), mode='bilinear') 
-     
-                        points = points[..., 0].permute(0, 2, 1)   
-
-                        points_list.append(points[None])  
-                        
-                points = torch.cat((points_list), 0)         
-                
             elif (method == "Tent_WA_FPS" or method == "Ensemble"):  
                 points_list = []  
                 #points_org = misc.fps(points, npoints)   
@@ -632,7 +596,7 @@ def tta_tent(args, config, train_writer=None):
                     points_org =  points_fps
                     points = torch.cat((points_list), 0)    
              
-                
+    
             elif (method == "Tent_WA_Aug"):   
                 points_list = []  
                 for i in range(n_aug):
@@ -674,20 +638,6 @@ def tta_tent(args, config, train_writer=None):
                 points_org = points           
                 points = torch.cat((points_list), 0)                
                 
-            elif (method == "Tent_WA_FPS_Downsample"):   
-                points_list = []  
-                for i in range(n_aug):  
-                    points_org = points
-                    points = pytorch3d.ops.sample_farthest_points(points, K=npoints, random_start_point= True)[0] 
-                    points_list.append(points[None]) 
-                    
-                    if (i < Number_downsample):
-                        points = pytorch3d.ops.sample_farthest_points(points_org, K= N_downsample, random_start_point= True)[0]
-                        points = torch.nn.functional.interpolate(points.permute(0, 2, 1)[..., None], size= (npoints, 1), mode='bilinear') 
-                        points = points[..., 0].permute(0, 2, 1) 
-                        points_list.append(points[None])
-                                                
-                points = torch.cat((points_list), 0)          
             
             ####################################### Network  
             if (method == "Tent"):
@@ -716,42 +666,9 @@ def tta_tent(args, config, train_writer=None):
                     logits = adapted_model.module.classification_only(points, only_unmasked=False)  
                 elif(model_name == "PointNet" or model_name == "DGCNN_cls" or model_name == "PointNet_ssg_Plus_Plus" or model_name == "CurveNet"):    
                     logits = adapted_model.forward(points)      
+                         
                 
-            elif (method == "Tent_Dino"):   
-                if episodic:
-                    reset(args, config, logger)
-                adapted_model.train()
-                logits = tent_shot_utils.forward_and_adapt_tent_with_DINO(points, adapted_model, optimizer, iteration, mode = "train")
-                adapted_model.eval()
-                logits = tent_shot_utils.forward_and_adapt_tent_with_DINO(points, adapted_model, optimizer, iteration=1, mode = "val")           
-                
-            elif (method == "Tent_WA"):
-                if episodic:
-                    reset(args, config, logger)  
-                adapted_model.train() 
-                all_weights = []    
-                for i in range(n_aug):    
-                    points_p = points[(i*B): (i+1)*B] 
-                    logits, all_weights_cmp = tent_shot_utils.forward_and_adapt_tent_with_WA(points_p, adapted_model, optimizer, all_weights)
-                avg_state_dict = weight_average(all_weights_cmp)
-                adapted_model.load_state_dict(avg_state_dict, strict=False)
-                adapted_model.eval()
-                logits = adapted_model.module.classification_only(points_p, only_unmasked=False)        
-                
-            elif (method == "Tent_WA2"): 
-                if episodic:  
-                    reset(args, config, logger)   
-                adapted_model.train() 
-                all_weights = []    
-                for i in range(n_aug):    
-                    points_p = points[(i*B): (i+1)*B]
-                    logits, all_weights_cmp = tent_shot_utils.forward_and_adapt_tent_with_WA(points_p, adapted_model, optimizer, all_weights)
-                avg_state_dict = weight_average(all_weights_cmp)
-                adapted_model.load_state_dict(avg_state_dict, strict=False)
-                adapted_model.eval()
-                logits = adapted_model.module.classification_only(points[:B], only_unmasked=False)        
-                
-            elif (method == "Tent_WA_FPS" or method == "Tent_WA_Aug" or method == "Tent_WA_FPS_Downsample" or method == "Tent_WA_Aug_FPS"):   
+            elif (method == "Tent_WA_FPS" or method == "Tent_WA_Aug" or method == "Tent_WA_Aug_FPS"):   
                 if episodic:
                     reset(args, config, logger)   
                 adapted_model.train() 
