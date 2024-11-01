@@ -46,6 +46,10 @@ Then, extract all of these folders into the same directory for easier use.
 ### Adding corruptions to the data
 Please refer to [MATE](https://github.com/jmiemirza/MATE) GitHub. 
 
+### Pretrained Models on clean datasets
+All pretrained models on ModelNet, ShapeNet and ScanObjectNN can be found [Google Drive](https://drive.google.com/drive/folders/1wUH7gInq5OHwNo5c6bOVYMeguwZiEA0B?usp=sharing)
+
+
 
 ## Pretraining
 
@@ -61,9 +65,9 @@ CUDA_VISIBLE_DEVICES=0 python train.py --only_cls --config cfgs/pre_train/pretra
 For TTT, please go to `cfgs/tta/tta_<dataset_name>.yaml` and set the `tta_dataset_path` variable to the relative path of the dataset parent directory.  
 E.g. if your data for ModelNet-C is in `./data/tta_datasets/modelnet-c`, set the variable to `./data/tta_datasets`.  
 
-Prallel Mode: Please refer to <dataset_name>.yaml file and set loss_encoder=True
+Prallel Mode: Please refer to <dataset_name>.yaml file and set parallel_mode=True
 
-Sequential Mode: Please refer to <dataset_name>.yaml file and set reset_2=False
+Sequential Mode: Please refer to <dataset_name>.yaml file and set parallel_mode=False
 ```
 CUDA_VISIBLE_DEVICES=0 python ttt.py --dataset_name <dataset_name> --online --config cfgs/tta/tta_<dataset_name>.yaml --ckpts <path/to/pretrained/model> ---exp_name <path/to/saved>
 ```
