@@ -63,7 +63,8 @@ CUDA_VISIBLE_DEVICES=0 python train.py --only_cls --config cfgs/pre_train/pretra
 ## Test-Time-Adaptation (TTA)
 ### Setting data paths 
 For TTT, please go to `cfgs/tta/tta_<dataset_name>.yaml` and set the `tta_dataset_path` variable to the relative path of the dataset parent directory.  
-E.g. if your data for ModelNet-C is in `./data/tta_datasets/modelnet-c`, set the variable to `./data/tta_datasets`. Please set the method on Tent_WA_FPS (our method).
+
+E.g. if your data for ModelNet-C is in `./data/tta_datasets/modelnet-c`, set the variable to `./data/tta_datasets`. Please set the method on "Tent_WA_FPS" (our method) or "Tent_Modified" (origina tent).
 
 Prallel Mode: Please refer to <dataset_name>.yaml file and set parallel_mode=True
 
