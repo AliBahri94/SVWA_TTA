@@ -48,7 +48,7 @@ model : {
     num_heads: 6,   
     decoder_depth: 4,
     decoder_num_heads: 6,   
-    dataset_name: "shapenetcore",
+    dataset_name: "modelnet",
 
 
     #### Added by Ali
