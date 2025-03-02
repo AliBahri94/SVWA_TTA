@@ -430,6 +430,7 @@ class Point_MAE(nn.Module):
         self.group_norm = config.group_norm
         self.num_hid_cls_layers = config.num_hid_cls_layers
         self.trans_dim = config.transformer_config.trans_dim
+        self.dataset_name = config.transformer_config.dataset_name
 
         self.MAE_encoder = MaskTransformer(config)
         self.group_size = config.group_size
@@ -464,15 +465,18 @@ class Point_MAE(nn.Module):
 
             class_blocks.extend((nn.Linear(last_dim, 256), norm_layer, nn.ReLU(inplace=True), nn.Dropout(0.5)))
             last_dim = 256
-        self.class_head = nn.Sequential(*class_blocks, nn.Linear(last_dim, self.cls_dim))        ### uncomment for shapenet dataset     
-        
-        # Define the last layer separately    
-        # last_layer = nn.Linear(last_dim, self.cls_dim)          
 
-        # self.class_head = nn.Sequential(
-        #     *class_blocks,  # Unnamed layers
-        #     nn.Sequential(OrderedDict([("custom_last_layer_name", last_layer)]))  # Named layer  
-        # )    
+        if (self.dataset_name != "scanobject"):    
+            self.class_head = nn.Sequential(*class_blocks, nn.Linear(last_dim, self.cls_dim))        ### uncomment for shapenet dataset     
+        
+        if (self.dataset_name == "scanobject"):  
+            # Define the last layer separately    
+            last_layer = nn.Linear(last_dim, self.cls_dim)          
+
+            self.class_head = nn.Sequential(
+                *class_blocks,  # Unnamed layers
+                nn.Sequential(OrderedDict([("custom_last_layer_name", last_layer)]))  # Named layer  
+            )    
         
         
         print_log(f'[Point_MAE] divide point cloud into G{self.num_group} x S{self.group_size} points ...',
@@ -720,13 +724,16 @@ class PointNet(nn.Module):
             channel = 6
         else: 
             channel = 3  
-                        
+
+        self.dataset_name = config.transformer_config.dataset_name     
         self.cls_dim = config.cls_dim    
         self.feat = PointNetEncoder(global_feat=True, feature_transform=True, channel=channel)   
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
-        #self.fc3 = nn.Linear(256, self.cls_dim)   
-        self.fc3_ = nn.Linear(256, self.cls_dim)              #### Fo loading shapenet  
+        if (self.dataset_name == "scanobject"): 
+            self.fc3 = nn.Linear(256, self.cls_dim)  
+        if (self.dataset_name != "scanobject"):  
+            self.fc3_ = nn.Linear(256, self.cls_dim)              #### Fo loading shapenet  
         #self.dropout = nn.Dropout(p=0.4)  
         self.dropout = nn.Dropout(p=0.3)    
         self.bn1 = nn.BatchNorm1d(512)
@@ -798,9 +805,11 @@ class PointNet(nn.Module):
         
         x, trans, trans_feat = self.feat(x.permute(0, 2, 1))  
         x = F.relu(self.bn1(self.fc1(x)))
-        x = F.relu(self.bn2(self.dropout(self.fc2(x))))                 
-        #x = self.fc3(x)
-        x = self.fc3_(x)
+        x = F.relu(self.bn2(self.dropout(self.fc2(x))))      
+        if (self.dataset_name == "scanobject"):           
+            x = self.fc3(x)
+        if (self.dataset_name != "scanobject"):    
+            x = self.fc3_(x)
         #x = F.log_softmax(x, dim=1)         
         return x
 
@@ -812,6 +821,7 @@ class DGCNN_cls(nn.Module):
         self.k = config.k
         
         self.cls_dim = config.cls_dim  
+        self.dataset_name = config.transformer_config.dataset_name     
         
         self.bn1 = nn.BatchNorm2d(64)
         self.bn2 = nn.BatchNorm2d(64)
@@ -840,8 +850,10 @@ class DGCNN_cls(nn.Module):
         self.linear2 = nn.Linear(512, 256)
         self.bn7 = nn.BatchNorm1d(256) 
         self.dp2 = nn.Dropout(p=config.dropout)
-        self.linear3 = nn.Linear(256, self.cls_dim)
-        #self.linear3_ = nn.Linear(256, self.cls_dim)                        #### for loading shapenet 
+        if (self.dataset_name == "scanobject"): 
+            self.linear3 = nn.Linear(256, self.cls_dim)
+        if (self.dataset_name != "scanobject"): 
+            self.linear3_ = nn.Linear(256, self.cls_dim)                        #### for loading shapenet 
          
         self.loss_ce = nn.CrossEntropyLoss() 
         
@@ -907,8 +919,10 @@ class DGCNN_cls(nn.Module):
         x = self.dp1(x)
         x = F.leaky_relu(self.bn7(self.linear2(x)), negative_slope=0.2) # (batch_size, 512) -> (batch_size, 256)
         x = self.dp2(x)
-        x = self.linear3(x)                                             # (batch_size, 256) -> (batch_size, output_channels)
-        #x = self.linear3_(x)                                                # (batch_size, 256) -> (batch_size, output_channels)        
+        if (self.dataset_name == "scanobject"): 
+            x = self.linear3(x)                                             # (batch_size, 256) -> (batch_size, output_channels)
+        if (self.dataset_name != "scanobject"): 
+            x = self.linear3_(x)                                                # (batch_size, 256) -> (batch_size, output_channels)           
         
         return x              
  
