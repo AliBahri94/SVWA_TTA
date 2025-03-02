@@ -1,4 +1,4 @@
-# [WACV2025] Test-Time Adaptation in Point Clouds: Leveraging Sampling Variation with Weight Averaging
+# [WACV2025-Oral Presentation] Test-Time Adaptation in Point Clouds: Leveraging Sampling Variation with Weight Averaging
 
 ![image](./figures/main_net.png)
 
