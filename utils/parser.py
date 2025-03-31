@@ -47,7 +47,7 @@ def get_args():
     parser.add_argument('--num_classes', default= 40)
     parser.add_argument('--baseline', type=str, default='tent', help='run adaptive baselines, choose from TENT, DUA, T3A, SHOT')
     parser.add_argument('--LR', type=float, default=1e-3)   
-    #parser.add_argument('--LR', type=float, default= 0.005)                      
+    # parser.add_argument('--LR', type=float, default= 1e-4)                              
     parser.add_argument('--BETA', type=int, default=0.9)
     parser.add_argument('--WD', type=int, default=0.)      
     parser.add_argument(
@@ -135,13 +135,19 @@ def get_args():
     if args.test:
         args.exp_name = 'test_' + args.exp_name       
     if args.mode is not None:
-        args.exp_name = args.exp_name + '_' + args.mode   
+        args.exp_name = args.exp_name + '_' + args.mode         
 
 
-    args.experiment_path = os.path.join('./experiments', Path(args.config).stem, Path(args.config).parent.stem,
-                                        args.exp_name)
-    args.tfboard_path = os.path.join('./experiments', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard',
+    args.experiment_path = os.path.join('./experiments/For_ICML_Paper/Batch_4_FPS_2_iter_1', Path(args.config).stem, Path(args.config).parent.stem,  
+                                        args.exp_name)   
+    args.tfboard_path = os.path.join('./experiments/For_ICML_Paper/Batch_4_FPS_2_iter_1', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard',  
                                      args.exp_name)    
+    
+
+    # args.experiment_path = os.path.join('./experiments/For_ICML_Paper/time', Path(args.config).stem, Path(args.config).parent.stem,  
+    #                                     args.exp_name)    
+    # args.tfboard_path = os.path.join('./experiments/For_ICML_Paper/time', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard',  
+    #                                  args.exp_name)   
 
     # args.experiment_path = os.path.join('/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained_for_test/shapenet_pointmae', Path(args.config).stem, Path(args.config).parent.stem, args.exp_name)
     # args.tfboard_path = os.path.join('/export/livia/home/vision/Abahri/projects/MATE/MATE/pretrained_for_test/shapenet_pointmae', Path(args.config).stem, Path(args.config).parent.stem, 'TFBoard', args.exp_name)  

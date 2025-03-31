@@ -678,14 +678,22 @@ def tta_tent(args, config, train_writer=None):
                     if (model_name == "Point_MAE"):    
                         if (cross_entropy == False):
                             # mean_time= 0
+                            # mean_time_2= 0
                             logits, all_weights_cmp = tent_shot_utils.forward_and_adapt_tent_with_WA(points[i], adapted_model, optimizer, all_weights, iteration, layer_norm)
                 
-                            """for f in range(100):
-                                start_time = time.time()
-                                logits, all_weights_cmp = tent_shot_utils.forward_and_adapt_tent_with_WA(points[i], adapted_model, optimizer, all_weights, iteration, layer_norm)
-                                end_time = time.time()
-                                mean_time += (end_time - start_time)
-                            print(f"Execution time: {mean_time/100.} seconds")"""
+                            # for f in range(100):
+                            #     start_time = time.time()
+                            #     logits, all_weights_cmp = tent_shot_utils.forward_and_adapt_tent_with_WA(points[i], adapted_model, optimizer, all_weights, iteration, layer_norm)
+                            #     end_time = time.time()
+                            #     mean_time += (end_time - start_time)
+                            # for f in range(100):    
+                            #     start_time = time.time()    
+                            #     avg_state_dict = weight_average(all_weights_cmp[:6]) 
+                            #     end_time = time.time()
+                            #     mean_time_2 += (end_time - start_time)
+
+                            # print(f"Execution time: {mean_time/100.} seconds")
+                            # print(f"Execution time_2: {mean_time_2/100.} seconds")
 
                             if (episodic_2):
                                 reset(args, config, logger)   

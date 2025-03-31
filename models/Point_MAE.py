@@ -466,12 +466,12 @@ class Point_MAE(nn.Module):
             class_blocks.extend((nn.Linear(last_dim, 256), norm_layer, nn.ReLU(inplace=True), nn.Dropout(0.5)))
             last_dim = 256
 
-        if (self.dataset_name != "scanobject"):    
+        if (self.dataset_name != "scanobject"):      
             self.class_head = nn.Sequential(*class_blocks, nn.Linear(last_dim, self.cls_dim))        ### uncomment for shapenet dataset     
         
         if (self.dataset_name == "scanobject"):  
             # Define the last layer separately    
-            last_layer = nn.Linear(last_dim, self.cls_dim)          
+            last_layer = nn.Linear(last_dim, self.cls_dim)            
 
             self.class_head = nn.Sequential(
                 *class_blocks,  # Unnamed layers

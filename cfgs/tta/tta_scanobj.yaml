@@ -17,7 +17,7 @@ dataset : {
   test : { _base_: cfgs/dataset_configs/ModelNet40.yaml,
             others: {subset: 'test'}}}
 model : {
-  NAME: PointNet,      
+  NAME: Point_MAE,      
   group_size: 32, 
   num_group: 128,
   loss: cdl2,
@@ -44,13 +44,13 @@ model : {
     dataset_name: "scanobject",
 
     #### Added by Ali
-    method: Tent_WA_FPS,                       ### Tent_Modified ,    Tent_WA_FPS: our method         
+    method: Tent_WA_FPS,                         ### Tent_Modified ,    Tent_WA_FPS: our method         
     reset: True,            
     parallel_mode: True,   
     loss_encoder: "MSE",                         
-    N_Aug: 6,        
-    Type_Aug: "jitter",                                                              
-    batch_size: 128,                                           
+    N_Aug: 2,        
+    Type_Aug: "None",                                                                
+    batch_size: 4,                                            
     iteration: 1,                
     original: True,                           ### default: True
     cross_entropy: False,                                              

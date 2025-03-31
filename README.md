@@ -70,7 +70,7 @@ Prallel Mode: Please refer to <dataset_name>.yaml file and set parallel_mode=Tru
 
 Sequential Mode: Please refer to <dataset_name>.yaml file and set parallel_mode=False
 ```
-CUDA_VISIBLE_DEVICES=0 python ttt.py --dataset_name <dataset_name> --online --config cfgs/tta/tta_<dataset_name>.yaml --ckpts <path/to/pretrained/model> ---exp_name <path/to/saved>
+CUDA_VISIBLE_DEVICES=0 python ttt.py --dataset_name <dataset_name> --online --config cfgs/tta/tta_<dataset_name>.yaml --ckpts <path/to/pretrained/model> --exp_name <path/to/saved>
 ```
 
 ## Inference
